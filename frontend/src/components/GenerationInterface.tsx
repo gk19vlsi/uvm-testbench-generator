@@ -46,16 +46,78 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
     results: false,
   });
 
-  // Placeholder for project data loading
+  // Load project data and check generation status
   useEffect(() => {
     if (!projectId) {
       navigate("/dashboard");
       return;
     }
 
-    // TODO: Load project data from API
-    setProjectName("Project " + projectId.substring(0, 8));
+    const loadProjectData = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}`);
+        if (response.ok) {
+          const data = await response.json();
+          const project = data.project;
+          
+          setProjectName(project.name || "Project " + projectId.substring(0, 8));
+          
+          // Check if generation is complete
+          if (project.status === "completed") {
+            setGenerationStatus("completed");
+            if (project.currentGeneration) {
+              setGenerationId(project.currentGeneration.generationId);
+            }
+          } else if (project.status === "failed") {
+            setGenerationStatus("failed");
+            if (project.currentGeneration) {
+              setGenerationId(project.currentGeneration.generationId);
+            }
+          } else if (project.status === "generating") {
+            setGenerationStatus("generating");
+            if (project.currentGeneration) {
+              setGenerationId(project.currentGeneration.generationId);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error loading project data:", error);
+      }
+    };
+
+    loadProjectData();
   }, [projectId, navigate]);
+
+  // Poll project status when generating
+  useEffect(() => {
+    if (generationStatus !== "generating" || !projectId) {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}`);
+        if (response.ok) {
+          const project = await response.json();
+          
+          // Check if generation is complete
+          if (project.status === "completed") {
+            setGenerationStatus("completed");
+            clearInterval(pollInterval);
+            // Reload to show results
+            window.location.reload();
+          } else if (project.status === "failed") {
+            setGenerationStatus("failed");
+            clearInterval(pollInterval);
+          }
+        }
+      } catch (error) {
+        console.error("Error polling project status:", error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [generationStatus, projectId]);
 
   const handleGenerationStart = (genId: string) => {
     setGenerationId(genId);
@@ -66,6 +128,8 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
 
   const handleGenerationComplete = () => {
     setGenerationStatus("completed");
+    // Reload project data to get results
+    window.location.reload();
   };
 
   const handleGenerationFailed = () => {

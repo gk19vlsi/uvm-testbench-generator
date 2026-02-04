@@ -4,10 +4,18 @@
  * score breakdown, and recommendations
  */
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 
 interface ReadinessScoreDisplayProps {
-  score?: {
+  projectId: string;
+}
+
+const ReadinessScoreDisplay: React.FC<ReadinessScoreDisplayProps> = ({
+  projectId,
+}) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [score, setScore] = useState<{
     overall: number;
     breakdown: {
       completeness: number;
@@ -16,43 +24,134 @@ interface ReadinessScoreDisplayProps {
       coverage: number;
     };
     classification: "Not Ready" | "Needs Review" | "Ready";
-  };
-  recommendations?: Array<{
+  } | null>(null);
+  const [generatedFilesCount, setGeneratedFilesCount] = useState(0);
+  const [recommendations, setRecommendations] = useState<Array<{
     severity: "critical" | "warning" | "info";
     category: string;
     message: string;
     actionable: string;
-  }>;
-  generatedFilesCount?: number;
-}
+  }>>([]);
 
-const ReadinessScoreDisplay: React.FC<ReadinessScoreDisplayProps> = ({
-  score = {
-    overall: 92,
-    breakdown: {
-      completeness: 95,
-      connectivity: 100,
-      syntax: 88,
-      coverage: 85,
-    },
-    classification: "Ready",
-  },
-  recommendations = [
-    {
-      severity: "warning",
-      category: "Coverage",
-      message: "Consider adding more cross-coverage for signal interactions",
-      actionable: "Add cross-coverage between address and data signals",
-    },
-    {
-      severity: "info",
-      category: "Generation",
-      message: "24 files generated successfully",
-      actionable: "Review generated files in the UVM Tree",
-    },
-  ],
-  generatedFilesCount = 24,
-}) => {
+  // Fetch results from API
+  useEffect(() => {
+    const fetchResults = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/projects/${projectId}/results`);
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch results");
+        }
+
+        const data = await response.json();
+        
+        // Set readiness score
+        if (data.readinessScore) {
+          setScore(data.readinessScore);
+        }
+
+        // Set generated files count
+        if (data.generatedFiles) {
+          setGeneratedFilesCount(data.generatedFiles.length);
+        }
+
+        // Create recommendations based on score
+        const recs: Array<{
+          severity: "critical" | "warning" | "info";
+          category: string;
+          message: string;
+          actionable: string;
+        }> = [];
+
+        if (data.readinessScore) {
+          const { breakdown } = data.readinessScore;
+
+          if (breakdown.completeness < 70) {
+            recs.push({
+              severity: "critical",
+              category: "Completeness",
+              message: "Some required components are missing",
+              actionable: "Review the UVM tree and ensure all components are generated",
+            });
+          } else if (breakdown.completeness < 90) {
+            recs.push({
+              severity: "warning",
+              category: "Completeness",
+              message: "Consider adding optional components for better coverage",
+              actionable: "Add coverage collectors and assertions",
+            });
+          }
+
+          if (breakdown.connectivity < 70) {
+            recs.push({
+              severity: "critical",
+              category: "Connectivity",
+              message: "Signal connectivity issues detected",
+              actionable: "Check interface connections and port mappings",
+            });
+          } else if (breakdown.connectivity < 90) {
+            recs.push({
+              severity: "warning",
+              category: "Connectivity",
+              message: "Some signals may not be properly connected",
+              actionable: "Verify all interface signals are connected to DUT",
+            });
+          }
+
+          if (breakdown.syntax < 70) {
+            recs.push({
+              severity: "critical",
+              category: "Syntax",
+              message: "Syntax errors detected in generated code",
+              actionable: "Review and fix syntax errors in the code editor",
+            });
+          } else if (breakdown.syntax < 90) {
+            recs.push({
+              severity: "warning",
+              category: "Syntax",
+              message: "Minor syntax issues may need attention",
+              actionable: "Run syntax validation on all generated files",
+            });
+          }
+
+          if (breakdown.coverage < 70) {
+            recs.push({
+              severity: "warning",
+              category: "Coverage",
+              message: "Coverage model needs improvement",
+              actionable: "Add more covergroups and cross-coverage",
+            });
+          } else if (breakdown.coverage < 90) {
+            recs.push({
+              severity: "info",
+              category: "Coverage",
+              message: "Consider adding cross-coverage for signal interactions",
+              actionable: "Add cross-coverage between address and data signals",
+            });
+          }
+        }
+
+        // Add generation success message
+        recs.push({
+          severity: "info",
+          category: "Generation",
+          message: `${data.generatedFiles?.length || 0} files generated successfully`,
+          actionable: "Review generated files in the UVM Tree",
+        });
+
+        setRecommendations(recs);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching results:", err);
+        setError("Failed to load results");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchResults();
+  }, [projectId]);
   const getScoreColor = (score: number) => {
     if (score < 70) return { bg: "bg-red-500", text: "text-red-600", light: "bg-red-50" };
     if (score < 90) return { bg: "bg-yellow-500", text: "text-yellow-600", light: "bg-yellow-50" };
@@ -108,7 +207,23 @@ const ReadinessScoreDisplay: React.FC<ReadinessScoreDisplayProps> = ({
     );
   };
 
-  const scoreColor = useMemo(() => getScoreColor(score.overall), [score.overall]);
+  const scoreColor = useMemo(() => score ? getScoreColor(score.overall) : getScoreColor(0), [score]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error || !score) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-800">{error || "No results available"}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">

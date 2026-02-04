@@ -77,7 +77,8 @@ export class WebSocketClient {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10, // Increased from 5
+      timeout: 20000, // Increased timeout
     });
 
     // Set up event listeners

@@ -14,7 +14,7 @@ interface GenerationControlsProps {
 type GenerationMode = "mvp" | "production" | "advanced";
 
 const GenerationControls: React.FC<GenerationControlsProps> = ({
-  // projectId - TODO: Will be used for API calls
+  projectId,
   onGenerationStart,
   disabled = false,
 }) => {
@@ -66,22 +66,22 @@ const GenerationControls: React.FC<GenerationControlsProps> = ({
     setIsGenerating(true);
 
     try {
-      // TODO: Call actual API endpoint
-      // const response = await fetch(`/api/projects/${projectId}/generate`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ mode: selectedMode })
-      // });
-      // const data = await response.json();
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const mockGenerationId = Math.random().toString(36).substring(7);
-
-      onGenerationStart(mockGenerationId);
+      // Call actual API endpoint
+      const response = await fetch(`/api/projects/${projectId}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: selectedMode })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Generation failed: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      onGenerationStart(data.generationId);
     } catch (error) {
       console.error("Failed to start generation:", error);
-    } finally {
+      alert(`Failed to start generation: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsGenerating(false);
     }
   };

@@ -11,6 +11,7 @@ import InlineCodeEditor from "./InlineCodeEditor";
 import SequenceCreator from "./SequenceCreator";
 import DownloadManager from "./DownloadManager";
 import ReadinessScoreDisplay from "./ReadinessScoreDisplay";
+import GeneratedFilesList from "./GeneratedFilesList";
 import { updateFileContent } from "../services/projectService";
 import type { UVMTreeNode } from "../types";
 
@@ -19,7 +20,7 @@ interface ResultsSectionProps {
   projectName?: string;
 }
 
-type ResultTab = "tree" | "matrix" | "editor" | "readiness" | "download";
+type ResultTab = "tree" | "matrix" | "editor" | "readiness" | "files" | "download";
 
 const ResultsSection: React.FC<ResultsSectionProps> = ({
   projectId,
@@ -36,6 +37,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
 
   const tabs = [
     { id: "readiness" as ResultTab, name: "Readiness Score", icon: "📊" },
+    { id: "files" as ResultTab, name: "Files", icon: "📁" },
     { id: "tree" as ResultTab, name: "UVM Tree", icon: "🌳" },
     { id: "matrix" as ResultTab, name: "Traceability", icon: "📋" },
     { id: "editor" as ResultTab, name: "Code Editor", icon: "💻" },
@@ -53,6 +55,16 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     const language = node.filePath.endsWith(".sv") ? "systemverilog" : "verilog";
     setEditorFile({
       filePath: node.filePath,
+      content,
+      language,
+    });
+    setActiveTab("editor");
+  };
+
+  const handleFileSelect = (filePath: string, content: string) => {
+    const language = filePath.endsWith(".sv") ? "systemverilog" : "verilog";
+    setEditorFile({
+      filePath,
       content,
       language,
     });
@@ -111,7 +123,11 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
   };
 
   const renderReadinessScore = () => (
-    <ReadinessScoreDisplay />
+    <ReadinessScoreDisplay projectId={projectId} />
+  );
+
+  const renderFilesList = () => (
+    <GeneratedFilesList projectId={projectId} onFileSelect={handleFileSelect} />
   );
 
   const renderUVMTree = () => (
@@ -241,6 +257,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
       {/* Tab Content */}
       <div className="min-h-[300px] sm:min-h-[400px]">
         {activeTab === "readiness" && renderReadinessScore()}
+        {activeTab === "files" && renderFilesList()}
         {activeTab === "tree" && renderUVMTree()}
         {activeTab === "matrix" && renderTraceabilityMatrix()}
         {activeTab === "editor" && renderCodeEditor()}

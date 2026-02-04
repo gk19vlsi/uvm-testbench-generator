@@ -11,7 +11,7 @@ export type OpenAIModel = "gpt-4" | "gpt-3.5-turbo" | "gpt-4-turbo";
  * LLM Service for managing LangChain OpenAI provider
  */
 export class LLMService {
-  private currentModel: OpenAIModel = "gpt-4";
+  private currentModel: OpenAIModel = "gpt-3.5-turbo"; // Changed from gpt-4
   private llmInstance: ChatOpenAI | null = null;
 
   constructor() {

@@ -27,10 +27,11 @@ router.post(
 router.delete("/:projectId/files/:fileId", fileController.deleteFile);
 
 // Generation endpoints
-router.post("/:projectId/generate", generationController.generateTestbench);
-router.get(
-  "/:projectId/generation/:generationId/status",
-  generationController.getGenerationStatus,
+router.post("/:projectId/generate", (req, res, next) =>
+  generationController.generateTestbench(req, res, next),
+);
+router.get("/:projectId/generation/:generationId/status", (req, res, next) =>
+  generationController.getGenerationStatus(req, res, next),
 );
 
 // Results endpoints
