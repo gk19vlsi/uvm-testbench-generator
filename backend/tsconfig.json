@@ -2,7 +2,6 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
     "module": "commonjs",
     "target": "ES2022",
     "lib": ["ES2022"],
@@ -19,6 +18,6 @@
       "@uvm-chatbot/shared-types": ["../packages/shared-types/src"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../packages/shared-types/src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }
