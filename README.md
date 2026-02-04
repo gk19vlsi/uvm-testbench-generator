@@ -290,6 +290,4 @@ The system uses 7 specialized agents:
 
 MIT
 
-## Support
 
-For issues and questions, please refer to the design document in `.kiro/specs/uvm-testbench-chatbot/`.
