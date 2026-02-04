@@ -28,7 +28,7 @@
         "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
         "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
         "type-check": "npm run type-check --workspaces",
-        "start": "npm run start --workspace=backend"
+        "start": "cd backend && npm run start"
     },
     "devDependencies": {
         "@playwright/test": "^1.58.1",
