@@ -1,0 +1,58 @@
+// AXI Protocol-Specific Monitor Logic
+// Monitors AXI transactions on all channels
+
+// Monitor AXI Write Transaction
+fork
+  begin : write_addr_channel
+    @(vif.monitor_cb);
+    if (vif.monitor_cb.awvalid && vif.monitor_cb.awready) begin
+      trans.trans_type = WRITE;
+      trans.addr = vif.monitor_cb.awaddr;
+      trans.burst_length = vif.monitor_cb.awlen + 1;
+      trans.burst_size = vif.monitor_cb.awsize;
+      trans.burst_type = vif.monitor_cb.awburst;
+    end
+  end
+  
+  begin : write_data_channel
+    for (int i = 0; i < trans.burst_length; i++) begin
+      @(vif.monitor_cb);
+      while (!(vif.monitor_cb.wvalid && vif.monitor_cb.wready)) begin
+        @(vif.monitor_cb);
+      end
+      trans.data[i] = vif.monitor_cb.wdata;
+      trans.strb[i] = vif.monitor_cb.wstrb;
+      if (vif.monitor_cb.wlast) break;
+    end
+  end
+  
+  begin : write_resp_channel
+    @(vif.monitor_cb);
+    while (!(vif.monitor_cb.bvalid && vif.monitor_cb.bready)) begin
+      @(vif.monitor_cb);
+    end
+    trans.resp = vif.monitor_cb.bresp;
+  end
+join
+
+// Monitor AXI Read Transaction
+// (Similar structure for read address and read data channels)
+@(vif.monitor_cb);
+if (vif.monitor_cb.arvalid && vif.monitor_cb.arready) begin
+  trans.trans_type = READ;
+  trans.addr = vif.monitor_cb.araddr;
+  trans.burst_length = vif.monitor_cb.arlen + 1;
+  trans.burst_size = vif.monitor_cb.arsize;
+  trans.burst_type = vif.monitor_cb.arburst;
+  
+  // Collect read data
+  for (int i = 0; i < trans.burst_length; i++) begin
+    @(vif.monitor_cb);
+    while (!(vif.monitor_cb.rvalid && vif.monitor_cb.rready)) begin
+      @(vif.monitor_cb);
+    end
+    trans.data[i] = vif.monitor_cb.rdata;
+    trans.resp = vif.monitor_cb.rresp;
+    if (vif.monitor_cb.rlast) break;
+  end
+end

@@ -1,0 +1,84 @@
+// AXI Protocol-Specific Driver Logic
+// Handles AXI write address, write data, write response, read address, and read data channels
+
+// Drive AXI Write Transaction
+if (trans.trans_type == WRITE) begin
+  // Write Address Channel
+  fork
+    begin
+      @(vif.driver_cb);
+      vif.driver_cb.awvalid <= 1'b1;
+      vif.driver_cb.awaddr <= trans.addr;
+      vif.driver_cb.awlen <= trans.burst_length - 1;
+      vif.driver_cb.awsize <= trans.burst_size;
+      vif.driver_cb.awburst <= trans.burst_type;
+      
+      // Wait for awready
+      while (!vif.driver_cb.awready) begin
+        @(vif.driver_cb);
+      end
+      
+      @(vif.driver_cb);
+      vif.driver_cb.awvalid <= 1'b0;
+    end
+    
+    // Write Data Channel
+    begin
+      for (int i = 0; i < trans.burst_length; i++) begin
+        @(vif.driver_cb);
+        vif.driver_cb.wvalid <= 1'b1;
+        vif.driver_cb.wdata <= trans.data[i];
+        vif.driver_cb.wstrb <= trans.strb[i];
+        vif.driver_cb.wlast <= (i == trans.burst_length - 1);
+        
+        // Wait for wready
+        while (!vif.driver_cb.wready) begin
+          @(vif.driver_cb);
+        end
+      end
+      
+      @(vif.driver_cb);
+      vif.driver_cb.wvalid <= 1'b0;
+    end
+  join
+  
+  // Write Response Channel
+  vif.driver_cb.bready <= 1'b1;
+  while (!vif.driver_cb.bvalid) begin
+    @(vif.driver_cb);
+  end
+  trans.resp = vif.driver_cb.bresp;
+  @(vif.driver_cb);
+  vif.driver_cb.bready <= 1'b0;
+end
+
+// Drive AXI Read Transaction
+else if (trans.trans_type == READ) begin
+  // Read Address Channel
+  @(vif.driver_cb);
+  vif.driver_cb.arvalid <= 1'b1;
+  vif.driver_cb.araddr <= trans.addr;
+  vif.driver_cb.arlen <= trans.burst_length - 1;
+  vif.driver_cb.arsize <= trans.burst_size;
+  vif.driver_cb.arburst <= trans.burst_type;
+  
+  // Wait for arready
+  while (!vif.driver_cb.arready) begin
+    @(vif.driver_cb);
+  end
+  
+  @(vif.driver_cb);
+  vif.driver_cb.arvalid <= 1'b0;
+  
+  // Read Data Channel
+  vif.driver_cb.rready <= 1'b1;
+  for (int i = 0; i < trans.burst_length; i++) begin
+    while (!vif.driver_cb.rvalid) begin
+      @(vif.driver_cb);
+    end
+    trans.data[i] = vif.driver_cb.rdata;
+    trans.resp = vif.driver_cb.rresp;
+    @(vif.driver_cb);
+  end
+  vif.driver_cb.rready <= 1'b0;
+end

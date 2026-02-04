@@ -1,0 +1,53 @@
+// SPI Protocol-Specific Driver Logic
+// Handles SPI chip select, clock, MOSI, and MISO
+
+// Assert chip select
+@(vif.driver_cb);
+vif.driver_cb.cs_n <= 1'b0;
+
+// Transfer data
+for (int byte_idx = 0; byte_idx < trans.data_length; byte_idx++) begin
+  for (int bit_idx = 7; bit_idx >= 0; bit_idx--) begin
+    // Setup data on MOSI
+    vif.driver_cb.mosi <= trans.mosi_data[byte_idx][bit_idx];
+    
+    // Clock edge based on mode
+    if (trans.cpol == 0) begin
+      // CPOL=0: idle low, sample on rising edge
+      if (trans.cpha == 0) begin
+        // CPHA=0: setup on falling, sample on rising
+        @(vif.driver_cb);
+        vif.driver_cb.sclk <= 1'b1;
+        trans.miso_data[byte_idx][bit_idx] = vif.driver_cb.miso;
+        @(vif.driver_cb);
+        vif.driver_cb.sclk <= 1'b0;
+      end else begin
+        // CPHA=1: sample on rising, setup on falling
+        @(vif.driver_cb);
+        vif.driver_cb.sclk <= 1'b1;
+        trans.miso_data[byte_idx][bit_idx] = vif.driver_cb.miso;
+        @(vif.driver_cb);
+        vif.driver_cb.sclk <= 1'b0;
+      end
+    end else begin
+      // CPOL=1: idle high, sample on falling edge
+      if (trans.cpha == 0) begin
+        @(vif.driver_cb);
+        vif.driver_cb.sclk <= 1'b0;
+        trans.miso_data[byte_idx][bit_idx] = vif.driver_cb.miso;
+        @(vif.driver_cb);
+        vif.driver_cb.sclk <= 1'b1;
+      end else begin
+        @(vif.driver_cb);
+        vif.driver_cb.sclk <= 1'b0;
+        trans.miso_data[byte_idx][bit_idx] = vif.driver_cb.miso;
+        @(vif.driver_cb);
+        vif.driver_cb.sclk <= 1'b1;
+      end
+    end
+  end
+end
+
+// Deassert chip select
+@(vif.driver_cb);
+vif.driver_cb.cs_n <= 1'b1;

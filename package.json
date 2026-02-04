@@ -1,0 +1,47 @@
+{
+    "name": "uvm-testbench-chatbot",
+    "version": "1.0.0",
+    "description": "AI-powered UVM testbench generation system",
+    "private": true,
+    "workspaces": [
+        "packages/*",
+        "frontend",
+        "backend"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+        "dev:backend": "npm run dev --workspace=backend",
+        "dev:frontend": "npm run dev --workspace=frontend",
+        "build": "npm run build --workspaces",
+        "build:backend": "npm run build --workspace=backend",
+        "build:frontend": "npm run build --workspace=frontend",
+        "test": "npm run test --workspaces",
+        "test:backend": "npm run test --workspace=backend",
+        "test:frontend": "npm run test --workspace=frontend",
+        "test:integration": "npm run test --workspace=backend -- --testPathPattern=integration",
+        "test:e2e": "playwright test",
+        "test:e2e:ui": "playwright test --ui",
+        "test:e2e:headed": "playwright test --headed",
+        "test:e2e:debug": "playwright test --debug",
+        "test:all": "npm run test && npm run test:integration && npm run test:e2e",
+        "lint": "npm run lint --workspaces",
+        "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+        "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+        "type-check": "npm run type-check --workspaces"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.58.1",
+        "@typescript-eslint/eslint-plugin": "^6.21.0",
+        "@typescript-eslint/parser": "^6.21.0",
+        "concurrently": "^8.2.2",
+        "eslint": "^8.56.0",
+        "eslint-config-prettier": "^9.1.0",
+        "playwright": "^1.58.1",
+        "prettier": "^3.2.4",
+        "typescript": "^5.3.3"
+    },
+    "engines": {
+        "node": ">=18.0.0",
+        "npm": ">=9.0.0"
+    }
+}

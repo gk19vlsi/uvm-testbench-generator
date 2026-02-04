@@ -1,0 +1,76 @@
+// I2C Protocol-Specific Driver Logic
+// Handles I2C start condition, address, data, ACK/NACK, and stop condition
+
+// Generate start condition
+@(vif.driver_cb);
+vif.driver_cb.sda <= 1'b0;
+#100; // Hold time
+vif.driver_cb.scl <= 1'b0;
+
+// Send 7-bit address + R/W bit
+for (int i = 6; i >= 0; i--) begin
+  @(vif.driver_cb);
+  vif.driver_cb.sda <= trans.addr[i];
+  vif.driver_cb.scl <= 1'b1;
+  #100;
+  vif.driver_cb.scl <= 1'b0;
+end
+
+// Send R/W bit
+@(vif.driver_cb);
+vif.driver_cb.sda <= (trans.trans_type == READ);
+vif.driver_cb.scl <= 1'b1;
+#100;
+vif.driver_cb.scl <= 1'b0;
+
+// Wait for ACK from slave
+@(vif.driver_cb);
+vif.driver_cb.sda <= 1'bz; // Release SDA
+vif.driver_cb.scl <= 1'b1;
+trans.ack = !vif.driver_cb.sda; // ACK is active low
+#100;
+vif.driver_cb.scl <= 1'b0;
+
+// Send/receive data bytes
+for (int byte_idx = 0; byte_idx < trans.data_length; byte_idx++) begin
+  if (trans.trans_type == WRITE) begin
+    // Send data byte
+    for (int i = 7; i >= 0; i--) begin
+      @(vif.driver_cb);
+      vif.driver_cb.sda <= trans.data[byte_idx][i];
+      vif.driver_cb.scl <= 1'b1;
+      #100;
+      vif.driver_cb.scl <= 1'b0;
+    end
+    
+    // Wait for ACK
+    @(vif.driver_cb);
+    vif.driver_cb.sda <= 1'bz;
+    vif.driver_cb.scl <= 1'b1;
+    #100;
+    vif.driver_cb.scl <= 1'b0;
+  end else begin
+    // Receive data byte
+    for (int i = 7; i >= 0; i--) begin
+      @(vif.driver_cb);
+      vif.driver_cb.scl <= 1'b1;
+      trans.data[byte_idx][i] = vif.driver_cb.sda;
+      #100;
+      vif.driver_cb.scl <= 1'b0;
+    end
+    
+    // Send ACK/NACK
+    @(vif.driver_cb);
+    vif.driver_cb.sda <= (byte_idx == trans.data_length - 1) ? 1'b1 : 1'b0; // NACK on last byte
+    vif.driver_cb.scl <= 1'b1;
+    #100;
+    vif.driver_cb.scl <= 1'b0;
+  end
+end
+
+// Generate stop condition
+@(vif.driver_cb);
+vif.driver_cb.sda <= 1'b0;
+vif.driver_cb.scl <= 1'b1;
+#100;
+vif.driver_cb.sda <= 1'b1;

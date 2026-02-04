@@ -1,0 +1,23 @@
+{
+    "name": "@uvm-chatbot/shared-types",
+    "version": "1.0.0",
+    "description": "Shared TypeScript types for UVM Testbench Chatbot",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "type-check": "tsc --noEmit",
+        "lint": "eslint src --ext .ts",
+        "clean": "rm -rf dist"
+    },
+    "keywords": [
+        "uvm",
+        "types",
+        "shared"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "typescript": "^5.3.3"
+    }
+}

@@ -1,0 +1,38 @@
+// UART Protocol-Specific Driver Logic
+// Handles UART serial transmission with start bit, data bits, parity, and stop bits
+
+bit parity_bit;
+int bit_period;
+
+// Calculate bit period from baud rate
+bit_period = 1000000000 / trans.baud_rate; // in ns
+
+// Drive start bit (0)
+@(vif.driver_cb);
+vif.driver_cb.tx <= 1'b0;
+#bit_period;
+
+// Drive data bits (LSB first)
+for (int i = 0; i < trans.data_bits; i++) begin
+  vif.driver_cb.tx <= trans.data[i];
+  #bit_period;
+end
+
+// Drive parity bit if enabled
+if (trans.parity_enable) begin
+  parity_bit = ^trans.data[trans.data_bits-1:0]; // XOR of all data bits
+  if (trans.parity_type == ODD) begin
+    parity_bit = ~parity_bit;
+  end
+  vif.driver_cb.tx <= parity_bit;
+  #bit_period;
+end
+
+// Drive stop bit(s) (1)
+for (int i = 0; i < trans.stop_bits; i++) begin
+  vif.driver_cb.tx <= 1'b1;
+  #bit_period;
+end
+
+// Return to idle state
+vif.driver_cb.tx <= 1'b1;
