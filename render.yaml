@@ -1,0 +1,54 @@
+services:
+  # Backend Service
+  - type: web
+    name: uvm-testbench-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build:backend
+    startCommand: npm run start --workspace=backend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: MONGODB_URI
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+      - key: UPLOAD_DIR
+        value: ./projects
+    disk:
+      name: uvm-projects
+      mountPath: /opt/render/project/src/projects
+      sizeGB: 1
+
+  # Frontend Service
+  - type: web
+    name: uvm-testbench-frontend
+    env: static
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build:frontend
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://uvm-testbench-backend.onrender.com/api/*
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_WS_URL
+        sync: false
