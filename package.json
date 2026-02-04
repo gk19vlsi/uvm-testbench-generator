@@ -13,7 +13,7 @@
         "dev:backend": "npm run dev --workspace=backend",
         "dev:frontend": "npm run dev --workspace=frontend",
         "build": "npm run build --workspaces",
-        "build:backend": "npm run build --workspace=backend",
+        "build:backend": "npm run build --workspace=packages/shared-types && npm run build --workspace=backend",
         "build:frontend": "npm run build --workspace=frontend",
         "test": "npm run test --workspaces",
         "test:backend": "npm run test --workspace=backend",
@@ -27,7 +27,8 @@
         "lint": "npm run lint --workspaces",
         "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
         "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
-        "type-check": "npm run type-check --workspaces"
+        "type-check": "npm run type-check --workspaces",
+        "start": "npm run start --workspace=backend"
     },
     "devDependencies": {
         "@playwright/test": "^1.58.1",
