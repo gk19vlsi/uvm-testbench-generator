@@ -1,5 +1,4 @@
 {
-  "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
     "module": "commonjs",
@@ -15,9 +14,9 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@uvm-chatbot/shared-types": ["../packages/shared-types/src"]
+      "@uvm-chatbot/shared-types": ["../packages/shared-types/dist"]
     }
   },
-  "include": ["src/**/*", "../packages/shared-types/src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }
