@@ -15,3 +15,17 @@ code {
   font-family:
     source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
+
+/* Shimmer animation for progress bar */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}

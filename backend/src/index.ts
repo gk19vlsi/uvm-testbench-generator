@@ -52,6 +52,7 @@ app.get("/health", async (req, res) => {
 import projectRoutes from "./routes/projects";
 import llmRoutes from "./routes/llm";
 import testRoutes from "./routes/testRoutes";
+import * as simulationController from "./controllers/simulationController";
 
 app.get("/api", (req, res) => {
   res.json({
@@ -62,6 +63,7 @@ app.get("/api", (req, res) => {
       api: "/api",
       projects: "/api/projects",
       llm: "/api/llm",
+      simulators: "/api/simulators",
     },
     websocket: {
       connected: webSocketService.getTotalConnectedClients(),
@@ -74,6 +76,11 @@ app.get("/api", (req, res) => {
 app.use("/api/projects", projectRoutes);
 app.use("/api/llm", llmRoutes);
 app.use("/api/test", testRoutes);
+
+// Simulator info endpoint
+app.get("/api/simulators", (req, res, next) =>
+  simulationController.getAvailableSimulators(req, res, next),
+);
 
 // WebSocket connection handling is managed by WebSocketService
 // No additional handlers needed here

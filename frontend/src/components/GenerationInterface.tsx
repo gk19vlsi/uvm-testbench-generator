@@ -17,6 +17,9 @@ import GenerationControls from "./GenerationControls";
 import ProgressTracker from "./ProgressTracker";
 import ResultsSection from "./ResultsSection";
 import LLMSettingsDialog from "./LLMSettingsDialog";
+import VisualizationPanel from "./VisualizationPanel";
+import { TestbenchSpecification, Signal, SignalData } from "../types/simulation";
+import { InterfaceParser } from "../services/InterfaceParser";
 
 interface GenerationInterfaceProps {}
 
@@ -25,6 +28,7 @@ interface SectionState {
   controls: boolean;
   progress: boolean;
   results: boolean;
+  visualization: boolean;
 }
 
 const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
@@ -32,6 +36,10 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
   const navigate = useNavigate();
 
   const [projectName, setProjectName] = useState<string>("");
+  const [uploadedSpecFiles, setUploadedSpecFiles] = useState<any[]>([]);
+  const [uploadedRtlFiles, setUploadedRtlFiles] = useState<any[]>([]);
+  const [uvmTree, setUvmTree] = useState<any>(null);
+  const [generatedFiles, setGeneratedFiles] = useState<any[]>([]);
   const [generationStatus, setGenerationStatus] = useState<
     "idle" | "generating" | "completed" | "failed"
   >("idle");
@@ -44,6 +52,7 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
     controls: false,
     progress: false,
     results: false,
+    visualization: false,
   });
 
   // Load project data and check generation status
@@ -62,11 +71,50 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
           
           setProjectName(project.name || "Project " + projectId.substring(0, 8));
           
+          // Store uploaded files
+          if (project.specificationFiles && Array.isArray(project.specificationFiles)) {
+            setUploadedSpecFiles(project.specificationFiles.map((file: any) => ({
+              fileId: file.fileId,
+              filename: file.filename,
+              size: file.size,
+              mimeType: file.mimeType,
+              uploadedAt: file.uploadedAt,
+              type: "specification" as const,
+              status: "completed" as const,
+              progress: 100,
+            })));
+          }
+          
+          if (project.rtlFiles && Array.isArray(project.rtlFiles)) {
+            setUploadedRtlFiles(project.rtlFiles.map((file: any) => ({
+              fileId: file.fileId,
+              filename: file.filename,
+              size: file.size,
+              mimeType: file.mimeType,
+              uploadedAt: file.uploadedAt,
+              type: "rtl" as const,
+              status: "completed" as const,
+              progress: 100,
+            })));
+          }
+          
           // Check if generation is complete
           if (project.status === "completed") {
             setGenerationStatus("completed");
             if (project.currentGeneration) {
               setGenerationId(project.currentGeneration.generationId);
+            }
+            // Store results data - check both locations for backward compatibility
+            const results = data.generationResults || project.results;
+            if (results) {
+              console.log("[Project] Loaded results with", results.generatedFiles?.length, "generated files");
+              console.log("[Project] Results source:", data.generationResults ? "data.generationResults" : "project.results");
+              setUvmTree(results.uvmTree);
+              setGeneratedFiles(results.generatedFiles || []);
+            } else {
+              console.log("[Project] ❌ No results found in response");
+              console.log("[Project] Response keys:", Object.keys(data));
+              console.log("[Project] Project keys:", Object.keys(project));
             }
           } else if (project.status === "failed") {
             setGenerationStatus("failed");
@@ -138,6 +186,352 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
 
   const toggleSection = (section: keyof SectionState) => {
     setCollapsed((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Convert UVM tree to TestbenchSpecification format
+  const getSpecificationFromUvmTree = (): TestbenchSpecification => {
+    if (!uvmTree) {
+      // Return sample data if no UVM tree available
+      return getSampleSpecification();
+    }
+
+    return {
+      rtl: {
+        moduleName: projectName || "dut",
+        ports: [], // TODO: Extract from RTL files
+      },
+      verification: {
+        testCases: [], // TODO: Extract from test files
+        coverageGoals: [],
+      },
+      components: uvmTree.children || [uvmTree], // Use actual UVM tree
+      signals: [], // TODO: Extract from interface files
+      clocks: [
+        {
+          name: "clk",
+          period: 10,
+          dutyCycle: 0.5,
+          phase: 0,
+        },
+      ],
+    };
+  };
+
+  // Extract signals from generated interface files
+  const getSignalsFromGeneratedFiles = (): Signal[] => {
+    if (!generatedFiles || generatedFiles.length === 0) {
+      console.log("[Visualization] No generated files available, using sample signals");
+      return getSampleSignals();
+    }
+
+    console.log("[Visualization] Checking", generatedFiles.length, "files for interfaces");
+    console.log("[Visualization] Full generatedFiles array:", JSON.stringify(generatedFiles, null, 2));
+    console.log("[Visualization] Sample file structure:", JSON.stringify(generatedFiles[0], null, 2));
+    console.log("[Visualization] All file paths:", generatedFiles.map((f: any) => f.path || f.filename || f.name));
+    console.log("[Visualization] All file types:", generatedFiles.map((f: any) => f.type || f.fileType || "unknown"));
+
+    // Find interface files - check type property and path
+    const interfaceFiles = generatedFiles.filter(
+      (file: any) => {
+        console.log("[Visualization] Checking file:", {
+          path: file.path,
+          filename: file.filename,
+          name: file.name,
+          type: file.type,
+          fileType: file.fileType,
+          allKeys: Object.keys(file)
+        });
+        
+        // Check if type is "interface"
+        if (file.type === "interface" || file.fileType === "interface") {
+          console.log("[Visualization] ✓ Found interface file by type:", file.path || file.filename || file.name);
+          return true;
+        }
+        
+        // Fallback: check path for interface patterns
+        const pathStr = String(file.path || file.filename || file.name || "").toLowerCase();
+        const isInterface = pathStr.includes("interface") || pathStr.includes("_if.sv") || pathStr.endsWith("_if.sv");
+        
+        if (isInterface) {
+          console.log("[Visualization] ✓ Found interface file by path:", pathStr);
+        } else {
+          console.log("[Visualization] ✗ Not an interface file:", pathStr);
+        }
+        
+        return isInterface;
+      }
+    );
+
+    console.log("[Visualization] Found", interfaceFiles.length, "interface files");
+
+    if (interfaceFiles.length === 0) {
+      console.log("[Visualization] ❌ No interface files found in generated files");
+      console.log("[Visualization] Available file types:", generatedFiles.map((f: any) => f.type || f.fileType || "unknown"));
+      console.log("[Visualization] Available file paths:", generatedFiles.map((f: any) => f.path || f.filename || f.name));
+      console.log("[Visualization] Full file objects:", generatedFiles.map((f: any) => ({
+        path: f.path,
+        filename: f.filename,
+        name: f.name,
+        type: f.type,
+        fileType: f.fileType,
+        hasContent: !!f.content
+      })));
+      return getSampleSignals();
+    }
+
+    // Parse the first interface file
+    const interfaceFile = interfaceFiles[0];
+    console.log("[Visualization] Processing interface file:", {
+      path: interfaceFile.path || interfaceFile.filename || interfaceFile.name,
+      hasContent: !!interfaceFile.content,
+      contentLength: interfaceFile.content?.length || 0,
+      contentPreview: interfaceFile.content?.substring(0, 200) || "NO CONTENT",
+      allKeys: Object.keys(interfaceFile)
+    });
+    
+    try {
+      // If we have the content, parse it
+      if (interfaceFile.content) {
+        console.log("[Visualization] Parsing interface content...");
+        const parsedSignals = InterfaceParser.parseInterface(interfaceFile.content);
+        const vizSignals = InterfaceParser.toVisualizationSignals(parsedSignals);
+        console.log(`[Visualization] ✓ Successfully parsed ${vizSignals.length} signals from ${interfaceFile.path || interfaceFile.filename}`);
+        return vizSignals;
+      } else {
+        console.log("[Visualization] ❌ Interface file has no content property");
+        console.log("[Visualization] File keys:", Object.keys(interfaceFile));
+        console.log("[Visualization] Checking alternative content fields...");
+        
+        // Check for alternative content field names
+        const possibleContentFields = ['content', 'fileContent', 'data', 'text', 'code'];
+        for (const field of possibleContentFields) {
+          if (interfaceFile[field]) {
+            console.log(`[Visualization] Found content in field: ${field}`);
+            const parsedSignals = InterfaceParser.parseInterface(interfaceFile[field]);
+            const vizSignals = InterfaceParser.toVisualizationSignals(parsedSignals);
+            console.log(`[Visualization] ✓ Successfully parsed ${vizSignals.length} signals using field ${field}`);
+            return vizSignals;
+          }
+        }
+        
+        console.log("[Visualization] ❌ No content found in any known field");
+      }
+    } catch (error) {
+      console.error("[Visualization] ❌ Error parsing interface file:", error);
+      console.error("[Visualization] Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+
+    return getSampleSignals();
+  };
+
+  // Get signal data (would come from VCD file parsing or generate sample based on real signals)
+  const getSignalDataFromSimulation = (): SignalData[] => {
+    if (!generatedFiles || generatedFiles.length === 0) {
+      console.log("[Visualization] No generated files for signal data, using sample");
+      return getSampleSignalData();
+    }
+
+    console.log("[Visualization] Generating signal data from", generatedFiles.length, "files");
+
+    // Find interface files to extract signal definitions
+    const interfaceFiles = generatedFiles.filter(
+      (file: any) => {
+        // Check if type is "interface"
+        if (file.type === "interface" || file.fileType === "interface") {
+          return true;
+        }
+        
+        // Fallback: check path for interface patterns
+        const pathStr = String(file.path || file.filename || file.name || "").toLowerCase();
+        return pathStr.includes("interface") || pathStr.includes("_if.sv") || pathStr.endsWith("_if.sv");
+      }
+    );
+
+    console.log("[Visualization] Found", interfaceFiles.length, "interface files for signal data");
+
+    if (interfaceFiles.length === 0) {
+      console.log("[Visualization] No interface files for signal data, using sample");
+      return getSampleSignalData();
+    }
+
+    try {
+      const interfaceFile = interfaceFiles[0];
+      console.log("[Visualization] Generating signal data from:", interfaceFile.path || interfaceFile.filename || interfaceFile.name);
+      
+      // Check for content in various possible fields
+      const content = interfaceFile.content || interfaceFile.fileContent || interfaceFile.data || interfaceFile.text || interfaceFile.code;
+      
+      if (content) {
+        console.log("[Visualization] Parsing interface for signal data generation...");
+        const parsedSignals = InterfaceParser.parseInterface(content);
+        // Generate realistic sample data based on actual signal definitions
+        const signalData = InterfaceParser.generateSampleSignalData(parsedSignals, 100);
+        console.log(`[Visualization] ✓ Generated waveform data for ${signalData.length} signals`);
+        if (signalData.length > 0) {
+          console.log(`[Visualization] Sample signal data:`, signalData[0]);
+        }
+        return signalData;
+      } else {
+        console.log("[Visualization] ❌ No content found in interface file for signal data");
+      }
+    } catch (error) {
+      console.error("[Visualization] ❌ Error generating signal data:", error);
+      console.error("[Visualization] Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+
+    return getSampleSignalData();
+  };
+
+  // Helper function to get sample specification
+  // TODO: Replace with actual specification from backend
+  const getSampleSpecification = (): TestbenchSpecification => {
+    return {
+      rtl: {
+        moduleName: projectName || "dut",
+        ports: [],
+      },
+      verification: {
+        testCases: [],
+        coverageGoals: [],
+      },
+      components: [
+        {
+          id: "env_1",
+          type: "env",
+          name: `${projectName}_env`,
+          children: [
+            {
+              id: "agent_1",
+              type: "agent",
+              name: `${projectName}_agent`,
+              children: [
+                {
+                  id: "driver_1",
+                  type: "driver",
+                  name: `${projectName}_driver`,
+                  children: [],
+                },
+                {
+                  id: "monitor_1",
+                  type: "monitor",
+                  name: `${projectName}_monitor`,
+                  children: [],
+                },
+                {
+                  id: "sequencer_1",
+                  type: "sequencer",
+                  name: `${projectName}_sequencer`,
+                  children: [],
+                },
+              ],
+            },
+            {
+              id: "scoreboard_1",
+              type: "scoreboard",
+              name: `${projectName}_scoreboard`,
+              children: [],
+            },
+          ],
+        },
+      ],
+      signals: [],
+      clocks: [
+        {
+          name: "clk",
+          period: 10,
+          dutyCycle: 0.5,
+          phase: 0,
+        },
+      ],
+    };
+  };
+
+  // Helper function to get sample signals
+  // TODO: Replace with actual signals from backend
+  const getSampleSignals = (): Signal[] => {
+    return [
+      {
+        id: "clk",
+        name: "clk",
+        type: "clock",
+        color: "#22c55e",
+        bitWidth: 1,
+      },
+      {
+        id: "data_in",
+        name: "data_in",
+        type: "data",
+        color: "#3b82f6",
+        bitWidth: 8,
+      },
+      {
+        id: "data_out",
+        name: "data_out",
+        type: "data",
+        color: "#3b82f6",
+        bitWidth: 8,
+      },
+      {
+        id: "valid",
+        name: "valid",
+        type: "control",
+        color: "#f59e0b",
+        bitWidth: 1,
+      },
+    ];
+  };
+
+  // Helper function to get sample signal data
+  // TODO: Replace with actual signal data from backend/VCD parser
+  const getSampleSignalData = (): SignalData[] => {
+    return [
+      {
+        signalId: "clk",
+        transitions: Array.from({ length: 20 }, (_, i) => ({
+          time: i * 5,
+          value: i % 2,
+        })),
+      },
+      {
+        signalId: "data_in",
+        transitions: [
+          { time: 0, value: 0 },
+          { time: 10, value: 15 },
+          { time: 20, value: 32 },
+          { time: 30, value: 128 },
+          { time: 40, value: 255 },
+          { time: 50, value: 64 },
+        ],
+      },
+      {
+        signalId: "data_out",
+        transitions: [
+          { time: 0, value: 0 },
+          { time: 12, value: 15 },
+          { time: 22, value: 32 },
+          { time: 32, value: 128 },
+          { time: 42, value: 255 },
+          { time: 52, value: 64 },
+        ],
+      },
+      {
+        signalId: "valid",
+        transitions: [
+          { time: 0, value: 0 },
+          { time: 10, value: 1 },
+          { time: 20, value: 0 },
+          { time: 30, value: 1 },
+          { time: 40, value: 0 },
+          { time: 50, value: 1 },
+        ],
+      },
+    ];
   };
 
   const renderSectionHeader = (
@@ -269,7 +663,11 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
             </div>
             {!collapsed.upload && (
               <div className="p-4 sm:p-6">
-                <FileUploadSection projectId={projectId!} />
+                <FileUploadSection 
+                  projectId={projectId!} 
+                  initialSpecFiles={uploadedSpecFiles}
+                  initialRtlFiles={uploadedRtlFiles}
+                />
               </div>
             )}
           </section>
@@ -285,6 +683,7 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
                   projectId={projectId!}
                   onGenerationStart={handleGenerationStart}
                   disabled={generationStatus === "generating"}
+                  generationStatus={generationStatus}
                 />
               </div>
             )}
@@ -328,6 +727,30 @@ const GenerationInterface: React.FC<GenerationInterfaceProps> = () => {
               {!collapsed.results && (
                 <div className="p-4 sm:p-6">
                   <ResultsSection projectId={projectId!} projectName={projectName} />
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Visualization Section - Collapsible */}
+          {generationStatus === "completed" && (
+            <section className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-4 sm:p-6 border-b border-gray-200">
+                {renderSectionHeader(
+                  "5. Simulation Visualization",
+                  "visualization",
+                  "Interactive",
+                )}
+              </div>
+              {!collapsed.visualization && (
+                <div className="p-4 sm:p-6">
+                  <VisualizationPanel
+                    projectId={projectId!}
+                    generationId={generationId || undefined}
+                    specification={getSpecificationFromUvmTree()}
+                    signals={getSignalsFromGeneratedFiles()}
+                    signalData={getSignalDataFromSimulation()}
+                  />
                 </div>
               )}
             </section>

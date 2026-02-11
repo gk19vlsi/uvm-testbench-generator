@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { getResults, getFileContent } from "../services/projectService";
+import { getResults } from "../services/projectService";
 
 interface GeneratedFilesListProps {
   projectId: string;

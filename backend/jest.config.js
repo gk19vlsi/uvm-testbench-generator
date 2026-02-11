@@ -32,7 +32,9 @@ module.exports = {
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         skipLibCheck: true,
+        types: ["jest", "node"],
       },
+      isolatedModules: true,
     },
   },
 };

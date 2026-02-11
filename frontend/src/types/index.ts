@@ -116,3 +116,7 @@ export interface GenerationConfig {
   mode: GenerationMode;
   llmModel?: string;
 }
+
+// Re-export simulation visualization types
+export * from "./simulation";
+export * from "./vcd";

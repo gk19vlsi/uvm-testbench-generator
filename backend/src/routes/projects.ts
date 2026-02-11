@@ -8,6 +8,7 @@ import { projectController } from "../controllers/projectController";
 import { fileController } from "../controllers/fileController";
 import { generationController } from "../controllers/generationController";
 import { resultsController } from "../controllers/resultsController";
+import * as simulationController from "../controllers/simulationController";
 import { upload } from "../config/multer";
 
 const router = Router();
@@ -37,6 +38,20 @@ router.get("/:projectId/generation/:generationId/status", (req, res, next) =>
 // Results endpoints
 router.get("/:projectId/results", resultsController.getResults);
 router.get("/:projectId/download", resultsController.downloadTestbench);
+
+// Simulation endpoints
+router.post("/:projectId/simulate", (req, res, next) =>
+  simulationController.startSimulation(req, res, next),
+);
+router.get("/:projectId/simulate/:jobId/status", (req, res, next) =>
+  simulationController.getSimulationStatus(req, res, next),
+);
+router.get("/:projectId/simulate/:jobId/vcd", (req, res, next) =>
+  simulationController.getVCDFile(req, res, next),
+);
+router.delete("/:projectId/simulate/:jobId", (req, res, next) =>
+  simulationController.cancelSimulation(req, res, next),
+);
 
 // File content endpoints - use path parameter with wildcard
 router.get("/:projectId/files/:filePath(*)", resultsController.getFileContent);

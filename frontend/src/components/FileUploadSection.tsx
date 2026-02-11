@@ -10,6 +10,8 @@ import type { FileMetadata } from "../services/projectService";
 
 interface FileUploadSectionProps {
   projectId: string;
+  initialSpecFiles?: UploadedFile[];
+  initialRtlFiles?: UploadedFile[];
 }
 
 interface UploadedFile extends FileMetadata {
@@ -25,23 +27,82 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
 
 const FileUploadSection: React.FC<FileUploadSectionProps> = ({
   projectId,
+  initialSpecFiles = [],
+  initialRtlFiles = [],
 }) => {
-  const [specFiles, setSpecFiles] = useState<UploadedFile[]>([]);
-  const [rtlFiles, setRtlFiles] = useState<UploadedFile[]>([]);
+  const [specFiles, setSpecFiles] = useState<UploadedFile[]>(initialSpecFiles);
+  const [rtlFiles, setRtlFiles] = useState<UploadedFile[]>(initialRtlFiles);
   const [dragOverSpec, setDragOverSpec] = useState(false);
   const [dragOverRtl, setDragOverRtl] = useState(false);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
 
-  // Load existing files on mount
+  // Update state when initial files change
   useEffect(() => {
-    // TODO: Load existing files from API
-    // const loadFiles = async () => {
-    //   const project = await getProject(projectId);
-    //   setSpecFiles(project.specificationFiles);
-    //   setRtlFiles(project.rtlFiles);
-    // };
-    // loadFiles();
-  }, [projectId]);
+    if (initialSpecFiles.length > 0) {
+      setSpecFiles(initialSpecFiles);
+    }
+  }, [initialSpecFiles]);
+
+  useEffect(() => {
+    if (initialRtlFiles.length > 0) {
+      setRtlFiles(initialRtlFiles);
+    }
+  }, [initialRtlFiles]);
+
+  // Load existing files on mount only if no initial files provided
+  useEffect(() => {
+    // Skip if we already have initial files
+    if (initialSpecFiles.length > 0 || initialRtlFiles.length > 0) {
+      return;
+    }
+
+    const loadFiles = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}`);
+        if (response.ok) {
+          const data = await response.json();
+          const project = data.project;
+          
+          // Load specification files - with safe defaults
+          if (project.specificationFiles && Array.isArray(project.specificationFiles)) {
+            const specFiles: UploadedFile[] = project.specificationFiles.map((file: any) => ({
+              fileId: file.fileId || file.id || `spec-${Math.random()}`,
+              filename: file.filename || file.name || "Unknown file",
+              size: file.size || 0,
+              mimeType: file.mimeType || file.type || "application/octet-stream",
+              uploadedAt: file.uploadedAt || file.createdAt || new Date().toISOString(),
+              type: "specification" as const,
+              status: "completed" as const,
+              progress: 100,
+            }));
+            setSpecFiles(specFiles);
+          }
+          
+          // Load RTL files - with safe defaults
+          if (project.rtlFiles && Array.isArray(project.rtlFiles)) {
+            const rtlFiles: UploadedFile[] = project.rtlFiles.map((file: any) => ({
+              fileId: file.fileId || file.id || `rtl-${Math.random()}`,
+              filename: file.filename || file.name || "Unknown file",
+              size: file.size || 0,
+              mimeType: file.mimeType || file.type || "application/octet-stream",
+              uploadedAt: file.uploadedAt || file.createdAt || new Date().toISOString(),
+              type: "rtl" as const,
+              status: "completed" as const,
+              progress: 100,
+            }));
+            setRtlFiles(rtlFiles);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load existing files:", error);
+        // Don't break the UI - just log the error
+      }
+    };
+    
+    if (projectId) {
+      loadFiles();
+    }
+  }, [projectId, initialSpecFiles.length, initialRtlFiles.length]);
 
   const validateFile = (
     file: File,
